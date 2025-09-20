@@ -3,3 +3,7 @@ pydicom
 scikit-image
 matplotlib
 scipy
+gdcm
+pylibjpeg
+pylibjpeg-libjpeg
+pylibjpeg-openjpeg
