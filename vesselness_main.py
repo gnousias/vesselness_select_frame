@@ -107,37 +107,42 @@ if uploaded_files:
 
             # Vesselness peak detection
             peaks, norm_curve = process_frames(image_data, sigmas=range(2, 6))
-
+            
             if len(peaks) == 0:
                 st.warning(f"No vesselness peaks detected for {dicom_file.name}")
                 continue
-
-            # Pick the peak with minimal SSIM to first frame
-            reference_frame = image_data[0]
-            ssim_vals = [ssim(image_data[p], reference_frame) for p in peaks]
-            best_idx = peaks[np.argmin(ssim_vals)]
-            selected_frame = image_data[best_idx]
-
-            # Rescale and save
-            vessel_rescaled = exposure.rescale_intensity(selected_frame, out_range=(0, 255)).astype(np.uint8)
-            acquis_time = getattr(ds, 'AcquisitionTime', 'unknown')
-            output_filename = f"{acquis_time}_{dicom_file.name}_Selected_Frame{best_idx}.png"
-            output_path = os.path.join(output_folder, output_filename)
-            io.imsave(output_path, vessel_rescaled)
-
-            # Display results
-            st.image(vessel_rescaled, caption=f"Selected Frame (Peak {best_idx})", use_container_width=True)
-
+            
+            # Plot vesselness curve with detected peaks
             fig, ax = plt.subplots()
             ax.plot(norm_curve, label="Vesselness Curve")
-            ax.plot(peaks, norm_curve[peaks], "x", label="Peaks")
-            ax.axvline(best_idx, color="r", linestyle="--", label="Selected Frame")
+            ax.plot(peaks, norm_curve[peaks], "x", label="Detected Peaks")
             ax.legend()
             st.pyplot(fig)
+            
+            # Let user choose a peak
+            peak_choice = st.selectbox(
+                "Select a peak to use as the frame",
+                options=list(peaks),
+                format_func=lambda x: f"Frame {x} (vesselness={norm_curve[x]:.3f})"
+            )
+            
+            # Show selected frame
+            selected_frame = image_data[peak_choice]
+            vessel_rescaled = exposure.rescale_intensity(selected_frame, out_range=(0, 255)).astype(np.uint8)
+            
+            st.image(vessel_rescaled, caption=f"Selected Frame {peak_choice}", use_container_width=True)
+            
+            # Save button
+            if st.button(f"Save Frame {peak_choice} for {dicom_file.name}"):
+                acquis_time = getattr(ds, 'AcquisitionTime', 'unknown')
+                output_filename = f"{acquis_time}_{dicom_file.name}_Selected_Frame{peak_choice}.png"
+                output_path = os.path.join(output_folder, output_filename)
+                io.imsave(output_path, vessel_rescaled)
+                st.success(f"Saved selected frame: {output_path}")
 
-            st.success(f"Saved selected frame: {output_path}")
 
         except Exception as e:
             st.error(f"Error processing {dicom_file.name}: {e}")
+
 
 
