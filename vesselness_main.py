@@ -1,12 +1,15 @@
 import os
 import numpy as np
-import pydicom
 import streamlit as st
 from skimage import io, color, exposure
 from skimage.metrics import structural_similarity as ssim
 from scipy.signal import find_peaks
 import matplotlib.pyplot as plt
 from vesselness2D import vesselness2D
+
+import pydicom
+from pydicom.pixel_data_handlers.util import convert_color_space
+
 
 # Parameters
 VESSEL_PEAK_HEIGHT = 0.2  # fraction of max vesselness to consider a peak
@@ -29,6 +32,44 @@ def process_frames(image_data, sigmas=range(2, 6), tau=1.0, brightondark=False):
     norm_curve = vesselness_means / (vesselness_means.max() if vesselness_means.max() > 0 else 1)
     peaks, _ = find_peaks(norm_curve, height=VESSEL_PEAK_HEIGHT, distance=VESSEL_PEAK_DISTANCE)
     return peaks, norm_curve
+
+def load_dicom_image(dicom_file):
+    """Load a DICOM file and return its pixel array, handling compressed transfer syntaxes."""
+    try:
+        ds = pydicom.dcmread(dicom_file)
+        # Try to access pixel data directly
+        image_data = ds.pixel_array
+        return ds, image_data
+
+    except Exception as e:
+        # Handle compressed images
+        if "Unable to decode" in str(e) or "Unable to decompress" in str(e):
+            st.warning(f"Compressed DICOM detected: {dicom_file.name}. Trying to decompress...")
+
+            # Try GDCM
+            try:
+                import gdcm
+                ds = pydicom.dcmread(dicom_file, force=True)
+                ds.decompress()
+                image_data = ds.pixel_array
+                return ds, image_data
+            except Exception:
+                st.info("GDCM not available. Trying pylibjpeg...")
+
+            # Try pylibjpeg
+            try:
+                import pylibjpeg
+                ds = pydicom.dcmread(dicom_file, force=True)
+                ds.decompress()
+                image_data = ds.pixel_array
+                return ds, image_data
+            except Exception:
+                raise RuntimeError(
+                    "This DICOM file is compressed and requires either GDCM or pylibjpeg. "
+                    "Please add `gdcm` OR `pylibjpeg pylibjpeg-libjpeg pylibjpeg-openjpeg` to requirements.txt"
+                )
+        else:
+            raise e
 
 
 # --- Streamlit UI ---
@@ -99,3 +140,4 @@ if uploaded_files:
 
         except Exception as e:
             st.error(f"Error processing {dicom_file.name}: {e}")
+
