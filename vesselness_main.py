@@ -83,8 +83,7 @@ os.makedirs(output_folder, exist_ok=True)
 if uploaded_files:
     for dicom_file in uploaded_files:
         try:
-            ds = pydicom.dcmread(dicom_file)
-            image_data = ds.pixel_array
+            ds, image_data = load_dicom_image(dicom_file)
 
             # Normalize frame dimension ordering
             if image_data.ndim == 3:
@@ -140,4 +139,5 @@ if uploaded_files:
 
         except Exception as e:
             st.error(f"Error processing {dicom_file.name}: {e}")
+
 
