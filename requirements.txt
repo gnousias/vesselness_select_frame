@@ -1,2 +1,6 @@
 streamlit
 pydicom
+numpy
+skimage
+scipy
+matplotlib
