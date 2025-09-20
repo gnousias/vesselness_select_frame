@@ -1,6 +1,5 @@
 streamlit
 pydicom
-numpy
-skimage
-scipy
+scikit-image
 matplotlib
+scipy
