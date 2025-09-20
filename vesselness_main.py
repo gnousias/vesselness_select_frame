@@ -112,27 +112,39 @@ if uploaded_files:
                 st.warning(f"No vesselness peaks detected for {dicom_file.name}")
                 continue
             
-            # Plot vesselness curve with detected peaks
+            # --- Auto-selection (as before: pick peak with minimal SSIM to first frame) ---
+            reference_frame = image_data[0]
+            ssim_vals = [ssim(image_data[p], reference_frame) for p in peaks]
+            auto_best_idx = peaks[np.argmin(ssim_vals)]
+            
+            # --- Plot vesselness curve ---
             fig, ax = plt.subplots()
             ax.plot(norm_curve, label="Vesselness Curve")
             ax.plot(peaks, norm_curve[peaks], "x", label="Detected Peaks")
+            ax.axvline(auto_best_idx, color="r", linestyle="--", label="Auto-selected")
             ax.legend()
             st.pyplot(fig)
             
-            # Let user choose a peak
+            # --- Let user pick (default = auto-selected) ---
             peak_choice = st.selectbox(
-                "Select a peak to use as the frame",
+                "Select a peak (default is auto-selected)",
                 options=list(peaks),
+                index=list(peaks).index(auto_best_idx) if auto_best_idx in peaks else 0,
                 format_func=lambda x: f"Frame {x} (vesselness={norm_curve[x]:.3f})"
             )
             
-            # Show selected frame
+            # --- Show selected frame ---
             selected_frame = image_data[peak_choice]
             vessel_rescaled = exposure.rescale_intensity(selected_frame, out_range=(0, 255)).astype(np.uint8)
             
-            st.image(vessel_rescaled, caption=f"Selected Frame {peak_choice}", use_container_width=True)
+            st.image(
+                vessel_rescaled,
+                caption=f"Currently Selected Frame: {peak_choice} "
+                        f"({'auto' if peak_choice == auto_best_idx else 'manual'})",
+                use_container_width=True
+            )
             
-            # Save button
+            # --- Save button ---
             if st.button(f"Save Frame {peak_choice} for {dicom_file.name}"):
                 acquis_time = getattr(ds, 'AcquisitionTime', 'unknown')
                 output_filename = f"{acquis_time}_{dicom_file.name}_Selected_Frame{peak_choice}.png"
@@ -141,8 +153,10 @@ if uploaded_files:
                 st.success(f"Saved selected frame: {output_path}")
 
 
+
         except Exception as e:
             st.error(f"Error processing {dicom_file.name}: {e}")
+
 
 
 
